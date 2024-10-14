@@ -1,0 +1,131 @@
+import pygame
+from pygame.locals import *
+from OpenGL.GL import *
+from OpenGL.GLU import *
+import numpy as np
+import random
+
+# Inicjalizacja okna gry za pomocą pygame
+pygame.init()
+display = (800, 600)
+pygame.display.set_mode(display, DOUBLEBUF | OPENGL)
+
+# Ustawienia kamery
+gluPerspective(45, (display[0] / display[1]), 0.1, 50.0)
+glTranslatef(0.0, 0.0, -5)  # Ustawienie początkowej pozycji kamery
+
+# Definicja sześcianu (gracza)
+vertices = [
+    [1, 1, -1],
+    [1, -1, -1],
+    [-1, -1, -1],
+    [-1, 1, -1],
+    [1, 1, 1],
+    [1, -1, 1],
+    [-1, -1, 1],
+    [-1, 1, 1],
+]
+
+edges = [
+    (0, 1),
+    (1, 2),
+    (2, 3),
+    (3, 0),
+    (4, 5),
+    (5, 6),
+    (6, 7),
+    (7, 4),
+    (0, 4),
+    (1, 5),
+    (2, 6),
+    (3, 7),
+]
+
+# Funkcja do rysowania sześcianu w postaci krawędzi
+def draw_cube():
+    glBegin(GL_LINES)
+    for edge in edges:
+        for vertex in edge:
+            glVertex3fv(vertices[vertex])
+    glEnd()
+
+# Funkcja do generowania losowych sześcianów
+def generate_random_cubes(count, min_coord=-10, max_coord=10):
+    cubes = []
+    for _ in range(count):
+        x = random.uniform(min_coord, max_coord)
+        y = random.uniform(min_coord, max_coord)
+        z = random.uniform(min_coord, max_coord)
+        cubes.append([x, y, z])
+    return cubes
+
+# Funkcja do rysowania sześcianu w zadanej pozycji
+def draw_cube_at_position(position):
+    glPushMatrix()
+    glTranslatef(position[0], position[1], position[2])
+    draw_cube()
+    glPopMatrix()
+
+# Funkcja do obsługi ruchu kamery
+def move_camera(keys, camera_speed=0.1):
+    if keys[K_LEFT]:
+        glTranslatef(camera_speed, 0, 0)
+    if keys[K_RIGHT]:
+        glTranslatef(-camera_speed, 0, 0)
+    if keys[K_UP]:
+        glTranslatef(0, 0, camera_speed)
+    if keys[K_DOWN]:
+        glTranslatef(0, 0, -camera_speed)
+
+# Funkcja do obsługi obrotu kamery
+def rotate_camera(mouse_dx, mouse_dy, sensitivity=0.2):
+    glRotatef(mouse_dx * sensitivity, 0, 1, 0)  # Obrót w osi Y (lewo-prawo)
+    glRotatef(-mouse_dy * sensitivity, 1, 0, 0)  # Obrót w osi X (góra-dół)
+
+# Generowanie losowych sześcianów
+random_cubes = generate_random_cubes(10)
+
+# Pętla gry
+running = True
+pygame.mouse.set_visible(False)  # Ukrycie kursora myszy
+pygame.event.set_grab(True)  # Zablokowanie kursora w oknie
+last_mouse_position = pygame.mouse.get_pos()
+
+while running:
+    # Obsługa zamknięcia okna
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # Odczyt klawiszy
+    keys = pygame.key.get_pressed()
+    
+    # Poruszanie kamerą
+    move_camera(keys)
+
+    # Obrót kamery za pomocą myszy
+    mouse_position = pygame.mouse.get_pos()
+    mouse_dx = mouse_position[0] - last_mouse_position[0]
+    mouse_dy = mouse_position[1] - last_mouse_position[1]
+    rotate_camera(mouse_dx, mouse_dy)
+
+    # Zresetowanie pozycji myszy na środku ekranu
+    pygame.mouse.set_pos(display[0] // 2, display[1] // 2)
+    last_mouse_position = pygame.mouse.get_pos()
+
+    # Czyszczenie ekranu
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+    # Rysowanie gracza
+    draw_cube()
+
+    # Rysowanie losowych sześcianów
+    for cube_position in random_cubes:
+        draw_cube_at_position(cube_position)
+
+    # Odświeżanie wyświetlania
+    pygame.display.flip()
+    pygame.time.wait(10)
+
+# Zakończenie gry
+pygame.quit()
