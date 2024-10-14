@@ -1,0 +1,149 @@
+import pygame
+import math
+import random
+
+# Constants
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+MAP_WIDTH, MAP_HEIGHT = 8, 8
+TILE_SIZE = 64
+FPS = 60
+
+# Generate a random map: 1 = wall, 0 = empty space
+def generate_random_map():
+    game_map = [[1 for _ in range(MAP_WIDTH)] for _ in range(MAP_HEIGHT)]
+    
+    # Randomly create open spaces while ensuring boundaries are walls
+    for y in range(1, MAP_HEIGHT - 1):
+        for x in range(1, MAP_WIDTH - 1):
+            if random.random() > 0.3:  # 30% chance to create a wall
+                game_map[y][x] = 0
+    return game_map
+
+# Initialize Pygame
+pygame.init()
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.mouse.set_visible(False)
+pygame.event.set_grab(True)  # Lock the mouse to the window
+clock = pygame.time.Clock()
+
+# Load the gun texture
+gun_texture = pygame.image.load("gun_1.png").convert_alpha()  # Load image with transparency
+gun_texture = pygame.transform.scale(gun_texture, (200, 200))  # Scale to a suitable size
+
+# Generate the game map
+game_map = generate_random_map()
+
+# Player properties
+player_pos = [100, 100]
+player_angle = 0
+player_speed = 5
+player_turn_speed = 0.1
+
+def cast_ray(angle):
+    ray_x, ray_y = player_pos
+    sin_a = math.sin(angle)
+    cos_a = math.cos(angle)
+    
+    for depth in range(1, 800):  # Max distance to cast rays
+        ray_x = player_pos[0] + cos_a * depth
+        ray_y = player_pos[1] + sin_a * depth
+        
+        # Check if ray is hitting a wall
+        grid_x = int(ray_x / TILE_SIZE)
+        grid_y = int(ray_y / TILE_SIZE)
+
+        if 0 <= grid_x < MAP_WIDTH and 0 <= grid_y < MAP_HEIGHT:
+            if game_map[grid_y][grid_x] == 1:
+                # Wall hit
+                return depth
+
+    return None
+
+def draw_3D():
+    for ray in range(0, SCREEN_WIDTH):
+        angle = (player_angle - 30) + (ray / SCREEN_WIDTH) * 60
+        depth = cast_ray(math.radians(angle))
+        
+        if depth is not None:
+            # Simple height calculation based on distance
+            wall_height = min(600, 600 / (depth / 10))
+            pygame.draw.rect(screen, (255, 0, 0),
+                             (ray, (SCREEN_HEIGHT - wall_height) // 2, 1, wall_height))
+
+def can_move(dx, dy):
+    new_x = player_pos[0] + dx
+    new_y = player_pos[1] + dy
+
+    # Check for walls in the new position
+    grid_x = int(new_x / TILE_SIZE)
+    grid_y = int(new_y / TILE_SIZE)
+
+    if 0 <= grid_x < MAP_WIDTH and 0 <= grid_y < MAP_HEIGHT:
+        return game_map[grid_y][grid_x] == 0  # Can move if the space is empty
+
+    return False
+
+def draw_gun():
+    """Draw the gun in front of the player (at a fixed position on screen)."""
+    gun_pos_x = (SCREEN_WIDTH - gun_texture.get_width()) // 2
+    gun_pos_y = SCREEN_HEIGHT - gun_texture.get_height()
+    screen.blit(gun_texture, (gun_pos_x, gun_pos_y))  # Draw gun at the bottom center
+
+def main():
+    global player_angle
+    running = True
+
+    while running:
+        screen.fill((0, 0, 0))
+        draw_3D()  # Draw the 3D view without the map
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        # Handle mouse movement for camera rotation
+        mouse_x, mouse_y = pygame.mouse.get_rel()
+        player_angle += mouse_x * player_turn_speed
+
+        keys = pygame.key.get_pressed()
+        move_x = 0
+        move_y = 0
+
+        if keys[pygame.K_w]:  # Move forward
+            move_x = math.cos(math.radians(player_angle)) * player_speed
+            move_y = math.sin(math.radians(player_angle)) * player_speed
+            if can_move(move_x, move_y):
+                player_pos[0] += move_x
+                player_pos[1] += move_y
+
+        if keys[pygame.K_s]:  # Move backward
+            move_x = -math.cos(math.radians(player_angle)) * player_speed
+            move_y = -math.sin(math.radians(player_angle)) * player_speed
+            if can_move(move_x, move_y):
+                player_pos[0] += move_x
+                player_pos[1] += move_y
+
+        if keys[pygame.K_a]:  # Strafe left
+            strafe_x = -math.sin(math.radians(player_angle)) * player_speed
+            strafe_y = math.cos(math.radians(player_angle)) * player_speed
+            if can_move(strafe_x, strafe_y):
+                player_pos[0] += strafe_x
+                player_pos[1] += strafe_y
+
+        if keys[pygame.K_d]:  # Strafe right
+            strafe_x = math.sin(math.radians(player_angle)) * player_speed
+            strafe_y = -math.cos(math.radians(player_angle)) * player_speed
+            if can_move(strafe_x, strafe_y):
+                player_pos[0] += strafe_x
+                player_pos[1] += strafe_y
+
+        # Draw the gun after rendering the 3D view so it's on top
+        draw_gun()
+
+        pygame.display.flip()
+        clock.tick(FPS)
+
+    pygame.quit()
+
+if __name__ == "__main__":
+    main()
